@@ -4,12 +4,11 @@
   "description": "Steam bot written in NodeJS/JS that will send trades between 2 bots in order to increase \"Amount of trades done\"",
   "main": "bot.js",
   "dependencies": {
-    "steam-totp": "^2.1.1",
-    "steam-tradeoffer-manager": "^2.10.2",
-    "steam-user": "^4.19.3",
-    "steamcommunity": "^3.42.0"
+    "steam-totp": "^2.1.2",
+    "steam-tradeoffer-manager": "^2.13.0",
+    "steam-user": "^5.3.0",
+    "steamcommunity": "^3.50.3"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "node bot"
   },
