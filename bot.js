@@ -8,8 +8,13 @@ const SteamTradeOffer = require('./response_models/SteamTradeOffer.js');
 const TradeOfferManager = require('steam-tradeoffer-manager');
 var config = require('./config.js');
 
-const mainClient = new SteamUser();
-const botClient = new SteamUser();
+const mainClient = new SteamUser({
+   autoRelogin: false
+});
+
+const botClient = new SteamUser({
+   autoRelogin: false
+});
 
 const account1Credentials = new SteamAccountCredentials(config.account1.identity_secret, 
    config.account1.shared_secret, 
@@ -75,22 +80,47 @@ account2.getClient().on('loggedOn', () => {
    account2.printMessage('Logged in!');
 });
 
+// Prevent Steam login errors from crashing the entire container
+account1.getClient().on('error', (err) => {
+   console.error('Account 1 Steam error:', err.message, 'EResult:', err.eresult);
+});
+
+account2.getClient().on('error', (err) => {
+   console.error('Account 2 Steam error:', err.message, 'EResult:', err.eresult);
+});
+
 account2.getClient().on('webSession', async function(sessionID, cookies) {
    account2.getTradeOfferBot().setCookies(cookies);
    await account2.getSteamCommunity().setCookies(cookies);
 });
 
 account1.getClient().on('webSession', async function(sessionID, cookies) {
-   account1.getTradeOfferBot().setCookies(cookies);
-   await account1.getSteamCommunity().setCookies(cookies);
-   // Get the Item we want to trade.
-   var targetItem = await account1.getFirstItemInInventory();
-   
-   // Log the item we will be sending/receiving
-   account1.printMessage("The item in which we are using is/an " + targetItem.getName());
+   try {
+      account1.getTradeOfferBot().setCookies(cookies);
+      await account1.getSteamCommunity().setCookies(cookies);
 
-   // Send the trade offer.
-   await account1.sendTradeOffer(account2Credentials.getTradelink(), SECURITY_CODE.toString(), [targetItem], MAX_RETRIES);
+      // Get the item we want to trade.
+      var targetItem = await account1.getFirstItemInInventory();
+
+      // Log the item we will be sending/receiving.
+      account1.printMessage(
+         "The item in which we are using is/an " + targetItem.getName()
+      );
+
+      // Send the trade offer.
+      await account1.sendTradeOffer(
+         account2Credentials.getTradelink(),
+         SECURITY_CODE.toString(),
+         [targetItem],
+         MAX_RETRIES
+      );
+
+   } catch (err) {
+      account1.printMessage(
+         "Trade process failed: " +
+         (err && err.message ? err.message : err)
+      );
+   }
 });
 
 account1.getTradeOfferBot().on('newOffer', async (offerResponse) => {
