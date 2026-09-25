@@ -38,31 +38,64 @@ class SteamBotAccountManager {
         return inventoryItems[0];
     }
 
-    async sendTradeOffer(tradelink, message, steamInventoryItemList, maxRetries) {
-        return new Promise(async (resolve, reject) => {
-            let offer = this.tradeOfferBot.createOffer(tradelink);
-            offer.setMessage(message);
+async sendTradeOffer(tradelink, message, steamInventoryItemList, maxRetries) {
+    return new Promise((resolve, reject) => {
+        const offer = this.tradeOfferBot.createOffer(tradelink);
 
-            // Add all items to the trade offer.
-            steamInventoryItemList.forEach(item => offer.addMyItem(item.getRawData()));
+        offer.setMessage(message);
 
-            offer.send(async (err, status) => {
-                if (err) {
-                    // Servers are non-consistant. Some trade offers can fail even though nothing is wrong with the trade offer.
-                    // So we cna use simple recursion to try to resend the offer. It will retry N amount of times before fully crashing.
-                    if (maxRetries <= 0) {
-                        this.printMessage('Error in the sendTradeOffer Function');
-                        this.printMessage(err);
-                        return reject(err)
-                    }
-                    this.sendTradeOffer(tradelink, message, steamInventoryItemList, maxRetries-1)
-                } else if (status == 'pending') {
+        // Add all items to the trade offer.
+        steamInventoryItemList.forEach(item => {
+            offer.addMyItem(item.getRawData());
+        });
+
+        offer.send(async (err, status) => {
+            if (err) {
+                // Don't retry permanent/restriction errors.
+                if (err.eresult === 34) {
+                    this.printMessage(
+                        'Steam rejected the trade: ' + err.message
+                    );
+                    return reject(err);
+                }
+
+                if (maxRetries <= 0) {
+                    this.printMessage('Error in the sendTradeOffer function');
+                    this.printMessage(err);
+                    return reject(err);
+                }
+
+                this.printMessage(
+                    'Trade failed. Retrying... (' + maxRetries + ' retries remaining)'
+                );
+
+                try {
+                    const result = await this.sendTradeOffer(
+                        tradelink,
+                        message,
+                        steamInventoryItemList,
+                        maxRetries - 1
+                    );
+
+                    return resolve(result);
+                } catch (retryErr) {
+                    return reject(retryErr);
+                }
+            }
+
+            if (status === 'pending') {
+                try {
                     await this.#acceptConfirmation(offer);
                     return resolve(1);
+                } catch (confirmationErr) {
+                    return reject(confirmationErr);
                 }
-            });
+            }
+
+            return resolve(1);
         });
-    }
+    });
+}
 
     async acceptIncomingSafeTradeOffer(offer, maxRetries) {
         return new Promise(async (resolve, reject) => {
